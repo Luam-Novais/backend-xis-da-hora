@@ -9,10 +9,11 @@ export default class UserService {
     const validPassword = regexPassword.test(password);
     try {
       if (!validPassword || username.length < 3 || username.length > 20) {
-        return { message: 'Ocorreu um erro ao registrar o usuario, verfique os formato permitido dos dados.' };
+        if (!validPassword) return { message: 'A senha não atende aos critérios de segurança.' };
+        if (username.length < 3 || username.length > 20) return { message: 'Username precisa ter entre 3 e 20 caracteres.' };
       } else {
         if (!usernameExisting) {
-          await prisma.user.create({
+          const newUser = await prisma.user.create({
             data: {
               name,
               phone,
@@ -21,7 +22,7 @@ export default class UserService {
               password: await bcrypt.hash(password, 10),
             },
           });
-          const payload = { username, name };
+          const payload = { username, name, user_id: newUser.user_id };
           const token = jwt.sign(payload, process.env.SECRET_KEY, { expiresIn: '1h' });
           return { message: 'Usuario criado com sucesso', token };
         } else {
@@ -30,6 +31,22 @@ export default class UserService {
       }
     } catch (error) {
       console.log(error);
+    }
+  }
+  static async loginUser({ username, password }) {
+    const usernameExisting = await prisma.user.findUnique({ where: { username: username } });
+    try {
+      if (usernameExisting) {
+        const verifyPassword = await bcrypt.compare(password, usernameExisting.password);
+        if (usernameExisting.username !== username || !verifyPassword) return { message: 'Credenciais inválidas.' };
+        const payload = { username, user_id: usernameExisting.user_id };
+        const token = jwt.sign(payload, process.env.SECRET_KEY, { expiresIn: '1h' });
+        return { message: 'Login efetuado com sucesso.', token };
+      } else {
+        return { message: 'Usuário não encontrado.' };
+      }
+    } catch (err) {
+      return { message: 'Ocorreu um erro inesperado ao efetuar o login.' };
     }
   }
 }
