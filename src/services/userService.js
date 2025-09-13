@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 export default class UserService {
+   //função para efetuar a criação de um novo usuario
   static async createUser({ name, phone, address, username, password }) {
     const usernameExisting = await prisma.user.findUnique({ where: { username: username } });
     const regexPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{6,}$/;
@@ -24,7 +25,7 @@ export default class UserService {
           });
           const payload = { username, name, user_id: newUser.user_id };
           const token = jwt.sign(payload, process.env.SECRET_KEY, { expiresIn: '1h' });
-          return { message: 'Usuario criado com sucesso', token };
+          return { message: 'Usuario criado com sucesso', token, name: newUser.name };
         } else {
           return { message: 'Ocorreu um erro ao registrar o usuario, nome de usuario ja está em uso.' };
         }
@@ -33,6 +34,7 @@ export default class UserService {
       console.log(error);
     }
   }
+  //função para efetuar o login do usuario
   static async loginUser({ username, password }) {
     const usernameExisting = await prisma.user.findUnique({ where: { username: username } });
     try {
@@ -41,12 +43,25 @@ export default class UserService {
         if (usernameExisting.username !== username || !verifyPassword) return { message: 'Credenciais inválidas.' };
         const payload = { username, user_id: usernameExisting.user_id };
         const token = jwt.sign(payload, process.env.SECRET_KEY, { expiresIn: '1h' });
-        return { message: 'Login efetuado com sucesso.', token };
+        return { message: 'Login efetuado com sucesso.', token, name: usernameExisting.name };
       } else {
         return { message: 'Usuário não encontrado.' };
       }
     } catch (err) {
       return { message: 'Ocorreu um erro inesperado ao efetuar o login.' };
+    }
+  }
+  //função para verificar se o token do usuario ainda e valido.
+  static verifyToken(token){
+    if(token){
+      const verifyToken = jwt.verify(token, process.env.SECRET_KEY)
+      try{
+        if(verifyToken){
+          return {token}
+        }
+      }catch(err){
+        console.log(err)
+      }
     }
   }
 }
